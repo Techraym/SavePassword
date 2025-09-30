@@ -303,6 +303,253 @@ class AddPasswordDialog:
         password_entry.delete(0, tk.END)
         password_entry.insert(0, password)
 
+class SettingsDialog:
+    """Settings dialog with theme, language and other options"""
+    
+    def __init__(self, parent, password_manager, callback):
+        self.parent = parent
+        self.pm = password_manager
+        self.callback = callback
+        self.dialog = None
+        self.settings_manager = None
+        self.language_manager = None
+        self.theme_manager = None
+        
+        # Initialize managers
+        from utils.settings import SettingsManager
+        from utils.language_manager import LanguageManager
+        from gui.themes import ThemeManager
+        
+        self.settings_manager = SettingsManager()
+        self.language_manager = LanguageManager()
+        self.theme_manager = ThemeManager()
+    
+    def show(self):
+        """Show settings dialog"""
+        self.dialog = tk.Toplevel(self.parent)
+        self.dialog.title("Settings")
+        self.dialog.geometry("500x600")
+        self.dialog.transient(self.parent)
+        self.dialog.grab_set()
+        
+        # Center dialog
+        self.dialog.geometry("+%d+%d" % (
+            self.parent.winfo_rootx() + 100,
+            self.parent.winfo_rooty() + 50
+        ))
+        
+        # Create notebook for tabs
+        notebook = ttk.Notebook(self.dialog)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Appearance tab
+        appearance_frame = ttk.Frame(notebook)
+        notebook.add(appearance_frame, text="Appearance")
+        self.setup_appearance_tab(appearance_frame)
+        
+        # Security tab
+        security_frame = ttk.Frame(notebook)
+        notebook.add(security_frame, text="Security")
+        self.setup_security_tab(security_frame)
+        
+        # Language tab
+        language_frame = ttk.Frame(notebook)
+        notebook.add(language_frame, text="Language")
+        self.setup_language_tab(language_frame)
+        
+        # Buttons
+        btn_frame = ttk.Frame(self.dialog)
+        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        ttk.Button(btn_frame, text="Save", command=self.save_settings).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=self.dialog.destroy).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn_frame, text="Reset to Defaults", command=self.reset_defaults).pack(side=tk.LEFT, padx=5)
+    
+    def setup_appearance_tab(self, parent):
+        """Setup appearance settings"""
+        # Theme selection
+        theme_frame = ttk.LabelFrame(parent, text="Theme")
+        theme_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(theme_frame, text="Select Theme:").pack(anchor=tk.W, padx=5, pady=5)
+        
+        self.theme_var = tk.StringVar(value=self.settings_manager.get('theme', 'light'))
+        themes = self.theme_manager.get_theme_names()
+        
+        for theme in themes:
+            rb = ttk.Radiobutton(theme_frame, text=theme.capitalize(), 
+                               variable=self.theme_var, value=theme)
+            rb.pack(anchor=tk.W, padx=20, pady=2)
+        
+        # UI Settings
+        ui_frame = ttk.LabelFrame(parent, text="Interface")
+        ui_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Font size
+        ttk.Label(ui_frame, text="Font Size:").pack(anchor=tk.W, padx=5, pady=2)
+        self.font_size_var = tk.StringVar(value=str(self.settings_manager.get('font_size', 9)))
+        font_combo = ttk.Combobox(ui_frame, textvariable=self.font_size_var, 
+                                 values=["8", "9", "10", "11", "12"], state="readonly")
+        font_combo.pack(anchor=tk.W, padx=20, pady=2, fill=tk.X)
+        
+        # Window behavior
+        self.minimize_to_tray_var = tk.BooleanVar(value=self.settings_manager.get('minimize_to_tray', False))
+        ttk.Checkbutton(ui_frame, text="Minimize to system tray", 
+                       variable=self.minimize_to_tray_var).pack(anchor=tk.W, padx=5, pady=2)
+        
+        self.start_minimized_var = tk.BooleanVar(value=self.settings_manager.get('start_minimized', False))
+        ttk.Checkbutton(ui_frame, text="Start minimized", 
+                       variable=self.start_minimized_var).pack(anchor=tk.W, padx=5, pady=2)
+    
+    def setup_security_tab(self, parent):
+        """Setup security settings"""
+        # Auto-lock settings
+        lock_frame = ttk.LabelFrame(parent, text="Auto Lock")
+        lock_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        self.auto_lock_var = tk.BooleanVar(value=self.settings_manager.get('auto_lock', True))
+        ttk.Checkbutton(lock_frame, text="Enable auto-lock", 
+                       variable=self.auto_lock_var).pack(anchor=tk.W, padx=5, pady=2)
+        
+        ttk.Label(lock_frame, text="Lock after (minutes):").pack(anchor=tk.W, padx=5, pady=2)
+        self.lock_timeout_var = tk.StringVar(value=str(self.settings_manager.get('lock_timeout', 5)))
+        timeout_combo = ttk.Combobox(lock_frame, textvariable=self.lock_timeout_var,
+                                    values=["1", "3", "5", "10", "15", "30"], state="readonly")
+        timeout_combo.pack(anchor=tk.W, padx=20, pady=2, fill=tk.X)
+        
+        # Clipboard settings
+        clipboard_frame = ttk.LabelFrame(parent, text="Clipboard")
+        clipboard_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(clipboard_frame, text="Clear clipboard after (seconds):").pack(anchor=tk.W, padx=5, pady=2)
+        self.clipboard_time_var = tk.StringVar(value=str(self.settings_manager.get('clipboard_clear_time', 30)))
+        clipboard_combo = ttk.Combobox(clipboard_frame, textvariable=self.clipboard_time_var,
+                                      values=["15", "30", "45", "60", "120"], state="readonly")
+        clipboard_combo.pack(anchor=tk.W, padx=20, pady=2, fill=tk.X)
+        
+        # Backup settings
+        backup_frame = ttk.LabelFrame(parent, text="Backup")
+        backup_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Label(backup_frame, text="Auto-backup interval (days):").pack(anchor=tk.W, padx=5, pady=2)
+        self.backup_interval_var = tk.StringVar(value=str(self.settings_manager.get('backup_interval', 7)))
+        backup_combo = ttk.Combobox(backup_frame, textvariable=self.backup_interval_var,
+                                   values=["1", "3", "7", "14", "30"], state="readonly")
+        backup_combo.pack(anchor=tk.W, padx=20, pady=2, fill=tk.X)
+    
+    def setup_language_tab(self, parent):
+        """Setup language settings"""
+        lang_frame = ttk.LabelFrame(parent, text="Language")
+        lang_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        ttk.Label(lang_frame, text="Select Language:").pack(anchor=tk.W, padx=5, pady=5)
+        
+        # Get available languages
+        available_languages = self.language_manager.get_available_languages()
+        current_language = self.settings_manager.get('language', 'en')
+        
+        self.language_var = tk.StringVar(value=current_language)
+        
+        # Create language list
+        lang_list_frame = ttk.Frame(lang_frame)
+        lang_list_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(lang_list_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Create listbox
+        self.lang_listbox = tk.Listbox(lang_list_frame, yscrollcommand=scrollbar.set)
+        self.lang_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=self.lang_listbox.yview)
+        
+        # Add languages to listbox
+        lang_codes = []
+        for lang_code, lang_info in available_languages.items():
+            display_name = f"{lang_info.get('name', lang_code)} ({lang_code})"
+            self.lang_listbox.insert(tk.END, display_name)
+            lang_codes.append(lang_code)
+        
+        self.available_lang_codes = lang_codes
+        
+        # Select current language
+        if current_language in lang_codes:
+            index = lang_codes.index(current_language)
+            self.lang_listbox.selection_set(index)
+        
+        # Bind selection event
+        self.lang_listbox.bind('<<ListboxSelect>>', self.on_language_select)
+        
+        # Download language button
+        download_frame = ttk.Frame(lang_frame)
+        download_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Button(download_frame, text="Download Selected Language", 
+                  command=self.download_language).pack(side=tk.LEFT, padx=5)
+        
+        self.download_status = ttk.Label(download_frame, text="")
+        self.download_status.pack(side=tk.LEFT, padx=5)
+    
+    def on_language_select(self, event):
+        """Handle language selection"""
+        selection = self.lang_listbox.curselection()
+        if selection:
+            index = selection[0]
+            if index < len(self.available_lang_codes):
+                self.language_var.set(self.available_lang_codes[index])
+    
+    def download_language(self):
+        """Download selected language"""
+        lang_code = self.language_var.get()
+        if not lang_code:
+            messagebox.showwarning("Warning", "Please select a language first")
+            return
+        
+        if self.language_manager.download_language(lang_code):
+            self.download_status.config(text="Download successful!")
+            messagebox.showinfo("Success", f"Language {lang_code} downloaded successfully")
+        else:
+            self.download_status.config(text="Download failed!")
+            messagebox.showerror("Error", f"Failed to download language {lang_code}")
+    
+    def save_settings(self):
+        """Save all settings"""
+        try:
+            # Appearance settings
+            self.settings_manager.set('theme', self.theme_var.get())
+            self.settings_manager.set('font_size', int(self.font_size_var.get()))
+            self.settings_manager.set('minimize_to_tray', self.minimize_to_tray_var.get())
+            self.settings_manager.set('start_minimized', self.start_minimized_var.get())
+            
+            # Security settings
+            self.settings_manager.set('auto_lock', self.auto_lock_var.get())
+            self.settings_manager.set('lock_timeout', int(self.lock_timeout_var.get()))
+            self.settings_manager.set('clipboard_clear_time', int(self.clipboard_time_var.get()))
+            self.settings_manager.set('backup_interval', int(self.backup_interval_var.get()))
+            
+            # Language settings
+            self.settings_manager.set('language', self.language_var.get())
+            
+            # Apply language if changed
+            current_lang = self.language_manager.get_current_language()
+            if self.language_var.get() != current_lang:
+                self.language_manager.set_language(self.language_var.get())
+            
+            messagebox.showinfo("Success", "Settings saved successfully!")
+            self.dialog.destroy()
+            self.callback()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save settings: {str(e)}")
+    
+    def reset_defaults(self):
+        """Reset settings to defaults"""
+        if messagebox.askyesno("Confirm Reset", "Are you sure you want to reset all settings to defaults?"):
+            self.settings_manager.reset_to_defaults()
+            messagebox.showinfo("Success", "Settings reset to defaults!")
+            self.dialog.destroy()
+            self.callback()
+
 # Placeholder classes for other dialogs
 class PasswordGeneratorDialog:
     def __init__(self, parent, password_manager):
@@ -331,21 +578,6 @@ class CategoryManagerDialog:
         self.dialog.geometry("400x300")
         # Add category management implementation here
         ttk.Label(self.dialog, text="Category Manager - To be implemented").pack(pady=20)
-        ttk.Button(self.dialog, text="Close", command=self.dialog.destroy).pack(pady=10)
-
-class SettingsDialog:
-    def __init__(self, parent, password_manager, callback):
-        self.parent = parent
-        self.pm = password_manager
-        self.callback = callback
-        self.dialog = None
-    
-    def show(self):
-        self.dialog = tk.Toplevel(self.parent)
-        self.dialog.title("Settings")
-        self.dialog.geometry("400x300")
-        # Add settings implementation here
-        ttk.Label(self.dialog, text="Settings - To be implemented").pack(pady=20)
         ttk.Button(self.dialog, text="Close", command=self.dialog.destroy).pack(pady=10)
 
 class ViewPasswordDialog:

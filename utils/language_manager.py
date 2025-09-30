@@ -79,11 +79,18 @@ class LanguageManager:
             return False
     
     def set_language(self, language_code):
-        """Set current language"""
-        if language_code in self.available_languages:
-            return self.load_language(language_code)
+        """Set current language and save to settings"""
+        if self.load_language(language_code):
+            # Save to settings if available
+            try:
+                from utils.settings import SettingsManager
+                settings_manager = SettingsManager()
+                settings_manager.set('language', language_code)
+            except:
+                pass  # Settings might not be available yet
+            return True
         return False
-    
+        
     def get(self, key, default=None):
         """Get translation for key"""
         return self.translations.get(key, default or key)
