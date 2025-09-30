@@ -11,7 +11,7 @@ import tkinter as tk
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
-from gui.main_window import MainWindow
+from gui.main_windows import MainWindow
 from utils.settings import SettingsManager
 
 def main():

@@ -67,8 +67,8 @@ def main():
         # Add portable directory to path
         sys.path.insert(0, portable_dir)
         
-        # Import main application
-        from gui.main_window import MainWindow
+        # Import main application - CORRECTIE: main_windows ipv main_window
+        from gui.main_windows import MainWindow  # ← Dit is de correctie
         from core.password_manager import PasswordManager
         import tkinter as tk
         
